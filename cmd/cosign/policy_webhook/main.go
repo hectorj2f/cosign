@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/release-utils/version"
 
 	"github.com/sigstore/cosign/pkg/apis/cosigned/v1alpha1"
+	"github.com/sigstore/cosign/pkg/apis/cosigned/v1beta1"
 	"github.com/sigstore/cosign/pkg/reconciler/clusterimagepolicy"
 
 	// Register the provider-specific plugins
@@ -91,6 +92,7 @@ func NewPolicyValidatingAdmissionController(ctx context.Context, cmw configmap.W
 		"/validating",
 		map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
 			v1alpha1.SchemeGroupVersion.WithKind("ClusterImagePolicy"): &v1alpha1.ClusterImagePolicy{},
+			v1beta1.SchemeGroupVersion.WithKind("ClusterImagePolicy"):  &v1beta1.ClusterImagePolicy{},
 		},
 		func(ctx context.Context) context.Context {
 			return ctx
@@ -106,6 +108,7 @@ func NewPolicyMutatingAdmissionController(ctx context.Context, cmw configmap.Wat
 		"/defaulting",
 		map[schema.GroupVersionKind]resourcesemantics.GenericCRD{
 			v1alpha1.SchemeGroupVersion.WithKind("ClusterImagePolicy"): &v1alpha1.ClusterImagePolicy{},
+			v1beta1.SchemeGroupVersion.WithKind("ClusterImagePolicy"):  &v1beta1.ClusterImagePolicy{},
 		},
 		func(ctx context.Context) context.Context {
 			return ctx

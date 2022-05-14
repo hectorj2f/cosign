@@ -21,11 +21,13 @@ import (
 	"knative.dev/hack/schema/registry"
 
 	v1alpha1 "github.com/sigstore/cosign/pkg/apis/cosigned/v1alpha1"
+	v1beta1 "github.com/sigstore/cosign/pkg/apis/cosigned/v1beta1"
 )
 
 // schema is a tool to dump the schema for Eventing resources.
 func main() {
 	registry.Register(&v1alpha1.ClusterImagePolicy{})
+	registry.Register(&v1beta1.ClusterImagePolicy{})
 
 	if err := commands.New("github.com/sigstore/cosign").Execute(); err != nil {
 		log.Fatal("Error during command execution: ", err)

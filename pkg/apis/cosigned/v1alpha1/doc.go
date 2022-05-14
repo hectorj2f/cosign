@@ -14,4 +14,5 @@
 
 // +k8s:deepcopy-gen=package
 // +groupName=cosigned.sigstore.dev
+// +k8s:conversion-gen=github.com/sigstore/cosign/pkg/apis/cosigned/v1beta1
 package v1alpha1
