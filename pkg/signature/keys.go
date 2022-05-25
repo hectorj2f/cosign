@@ -169,10 +169,11 @@ func SignerVerifierFromKeyRef(ctx context.Context, keyRef string, pf cosign.Pass
 		if err == nil {
 			return sv, nil
 		}
-		var e *kms.ProviderNotFoundError
-		if !errors.As(err, &e) {
-			return nil, fmt.Errorf("kms get: %w", err)
-		}
+		// HECTOR:
+		// var e *kms.ProviderNotFoundError
+		//if !errors.As(err, &e) {
+		//	return nil, fmt.Errorf("kms get: %w", err)
+		//}
 		// ProviderNotFoundError is okay; loadKey handles other URL schemes
 	}
 

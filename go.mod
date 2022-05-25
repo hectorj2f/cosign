@@ -313,3 +313,7 @@ require (
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 )
+
+replace github.com/sigstore/sigstore => github.com/hectorj2f/sigstore v1.1.1-0.20220404211359-5e771313e510
+
+replace github.com/sigstore/fulcio => github.com/hectorj2f/fulcio v0.2.1-0.20220318174034-8ca73ad7dd04
