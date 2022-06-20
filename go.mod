@@ -25,8 +25,8 @@ require (
 	github.com/stretchr/testify v1.7.0
 	github.com/theupdateframework/go-tuf v0.0.0-20210630170422-22a94818d17b
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/term v0.0.0-20210615171337-6886f2dfbf5b
+	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
 	k8s.io/api v0.21.3
-	k8s.io/apimachinery v0.21.3
+	k8s.io/apimachinery v0.24.2
 	k8s.io/client-go v0.21.3
 )
