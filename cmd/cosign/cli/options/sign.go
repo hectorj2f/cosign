@@ -34,6 +34,7 @@ type SignOptions struct {
 	Attachment        string
 	SkipConfirmation  bool
 	NoTlogUpload      bool
+	TSAServerURL      string
 
 	Rekor       RekorOptions
 	Fulcio      FulcioOptions
@@ -98,4 +99,7 @@ func (o *SignOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(&o.NoTlogUpload, "no-tlog-upload", false,
 		"whether to not upload the transparency log")
+
+	cmd.Flags().StringVar(&o.TSAServerURL, "tsa-url", "",
+		"url to the Timestamp Authority, default none")
 }

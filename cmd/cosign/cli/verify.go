@@ -117,6 +117,8 @@ against the transparency log.`,
 				HashAlgorithm:                hashAlgorithm,
 				SignatureRef:                 o.SignatureRef,
 				LocalImage:                   o.LocalImage,
+				TSAServerURL:                 o.TSAServerURL,
+				TSACertChainPath:             o.TSACertChainPath,
 			}
 
 			return v.Exec(cmd.Context(), args)

@@ -21,12 +21,14 @@ import (
 
 // VerifyOptions is the top level wrapper for the `verify` command.
 type VerifyOptions struct {
-	Key          string
-	CheckClaims  bool
-	Attachment   string
-	Output       string
-	SignatureRef string
-	LocalImage   bool
+	Key              string
+	CheckClaims      bool
+	Attachment       string
+	Output           string
+	SignatureRef     string
+	LocalImage       bool
+	TSAServerURL     string
+	TSACertChainPath string
 
 	SecurityKey     SecurityKeyOptions
 	CertVerify      CertVerifyOptions
@@ -65,6 +67,12 @@ func (o *VerifyOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(&o.LocalImage, "local-image", false,
 		"whether the specified image is a path to an image saved locally via 'cosign save'")
+
+	cmd.Flags().StringVar(&o.TSAServerURL, "tsa-url", "",
+		"url to the Timestamp Authority, default none")
+
+	cmd.Flags().StringVar(&o.TSACertChainPath, "tsa-cert-chain", "",
+		"path to certificate chain PEM file for the Timestamp Authority")
 }
 
 // VerifyAttestationOptions is the top level wrapper for the `verify attestation` command.

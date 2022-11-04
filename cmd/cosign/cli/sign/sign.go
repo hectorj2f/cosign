@@ -40,6 +40,7 @@ import (
 	ifulcio "github.com/sigstore/cosign/internal/pkg/cosign/fulcio"
 	ipayload "github.com/sigstore/cosign/internal/pkg/cosign/payload"
 	irekor "github.com/sigstore/cosign/internal/pkg/cosign/rekor"
+	itsa "github.com/sigstore/cosign/internal/pkg/cosign/tsa"
 	"github.com/sigstore/cosign/pkg/cosign"
 	"github.com/sigstore/cosign/pkg/cosign/pivkey"
 	"github.com/sigstore/cosign/pkg/cosign/pkcs11key"
@@ -53,6 +54,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature"
 	signatureoptions "github.com/sigstore/sigstore/pkg/signature/options"
 	sigPayload "github.com/sigstore/sigstore/pkg/signature/payload"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 
 	// Loads OIDC providers
 	_ "github.com/sigstore/cosign/pkg/providers/all"
@@ -125,7 +127,7 @@ func ParseOCIReference(refStr string, out io.Writer) (name.Reference, error) {
 // nolint
 func SignCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.RegistryOptions, annotations map[string]interface{},
 	imgs []string, certPath string, certChainPath string, upload bool, outputSignature, outputCertificate string,
-	payloadPath string, force bool, recursive bool, attachment string, noTlogUpload bool) error {
+	payloadPath string, force bool, recursive bool, attachment string, noTlogUpload bool, tsaURL string) error {
 	if options.EnableExperimental() {
 		if options.NOf(ko.KeyRef, ko.Sk) > 1 {
 			return &options.KeyParseError{}
@@ -180,7 +182,7 @@ func SignCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.Regist
 			if err != nil {
 				return fmt.Errorf("accessing image: %w", err)
 			}
-			err = signDigest(ctx, digest, staticPayload, ko, regOpts, annotations, upload, outputSignature, outputCertificate, force, recursive, noTlogUpload, dd, sv, se)
+			err = signDigest(ctx, digest, staticPayload, ko, regOpts, annotations, upload, outputSignature, outputCertificate, force, recursive, noTlogUpload, tsaURL, dd, sv, se)
 			if err != nil {
 				return fmt.Errorf("signing digest: %w", err)
 			}
@@ -200,7 +202,7 @@ func SignCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.Regist
 			}
 			digest := ref.Context().Digest(d.String())
 
-			err = signDigest(ctx, digest, staticPayload, ko, regOpts, annotations, upload, outputSignature, outputCertificate, force, recursive, noTlogUpload, dd, sv, se)
+			err = signDigest(ctx, digest, staticPayload, ko, regOpts, annotations, upload, outputSignature, outputCertificate, force, recursive, noTlogUpload, tsaURL, dd, sv, se)
 			if err != nil {
 				return fmt.Errorf("signing digest: %w", err)
 			}
@@ -215,7 +217,7 @@ func SignCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.Regist
 
 func signDigest(ctx context.Context, digest name.Digest, payload []byte, ko options.KeyOpts,
 	regOpts options.RegistryOptions, annotations map[string]interface{}, upload bool, outputSignature, outputCertificate string, force bool, recursive bool, noTlogUpload bool,
-	dd mutate.DupeDetector, sv *SignerVerifier, se oci.SignedEntity) error {
+	tsaURL string, dd mutate.DupeDetector, sv *SignerVerifier, se oci.SignedEntity) error {
 	var err error
 	// The payload can be passed to skip generation.
 	if len(payload) == 0 {
@@ -232,6 +234,19 @@ func signDigest(ctx context.Context, digest name.Digest, payload []byte, ko opti
 	s = ipayload.NewSigner(sv)
 	if sv.Cert != nil {
 		s = ifulcio.NewSigner(s, sv.Cert, sv.Chain)
+	}
+	if tsaURL != "" {
+		clientTSA, err := tsaclient.GetTimestampClient(tsaURL, tsaclient.WithUserAgent("test User-Agent"))
+		if err != nil {
+			return fmt.Errorf("failed to create TSA client: %w", err)
+		}
+		/*certChain, err := clientTSA.Timestamp.GetTimestampCertChain(nil)
+		if err != nil || certChain.Error() != "" {
+			return fmt.Errorf("failed to get TSA certificate chain: %w with detailed message: %s", err, certChain.Error())
+		}*/
+		//if certChain.IsSuccess() {
+
+		s = itsa.NewSigner(s, clientTSA)
 	}
 	if ShouldUploadToTlog(ctx, digest, force, noTlogUpload, ko.RekorURL) {
 		rClient, err := rekor.NewClient(ko.RekorURL)

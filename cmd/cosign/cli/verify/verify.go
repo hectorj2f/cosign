@@ -42,6 +42,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/cryptoutils"
 	"github.com/sigstore/sigstore/pkg/signature"
 	"github.com/sigstore/sigstore/pkg/signature/payload"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 )
 
 // VerifyCommand verifies a signature on a supplied container image
@@ -71,6 +72,8 @@ type VerifyCommand struct {
 	SignatureRef                 string
 	HashAlgorithm                crypto.Hash
 	LocalImage                   bool
+	TSAServerURL                 string
+	TSACertChainPath             string
 }
 
 // Exec runs the verification command
@@ -98,6 +101,7 @@ func (c *VerifyCommand) Exec(ctx context.Context, images []string) (err error) {
 	if err != nil {
 		return fmt.Errorf("constructing client options: %w", err)
 	}
+
 	co := &cosign.CheckOpts{
 		Annotations:                  c.Annotations.Annotations,
 		RegistryClientOpts:           ociremoteOpts,
@@ -111,6 +115,13 @@ func (c *VerifyCommand) Exec(ctx context.Context, images []string) (err error) {
 		CertGithubWorkflowRef:        c.CertGithubWorkflowRef,
 		EnforceSCT:                   c.EnforceSCT,
 		SignatureRef:                 c.SignatureRef,
+		TSACertChainPath:             c.TSACertChainPath,
+	}
+	if c.TSAServerURL != "" {
+		co.TSAClient, err = tsaclient.GetTimestampClient(c.TSAServerURL, tsaclient.WithUserAgent("test User-Agent"))
+		if err != nil {
+			return fmt.Errorf("failed to create TSA client: %w", err)
+		}
 	}
 	if c.CheckClaims {
 		co.ClaimVerifier = cosign.SimpleClaimVerifier
