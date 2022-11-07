@@ -91,7 +91,7 @@ func SignBlob() *cobra.Command {
 					fmt.Fprintln(os.Stderr, "WARNING: the '--output' flag is deprecated and will be removed in the future. Use '--output-signature'")
 					o.OutputSignature = o.Output
 				}
-				if _, err := sign.SignBlobCmd(ro, ko, o.Registry, blob, o.Base64Output, o.OutputSignature, o.OutputCertificate); err != nil {
+				if _, err := sign.SignBlobCmd(ro, ko, o.Registry, blob, o.Base64Output, o.OutputSignature, o.OutputCertificate, o.TSAServerURL); err != nil {
 					return fmt.Errorf("signing %s: %w", blob, err)
 				}
 			}

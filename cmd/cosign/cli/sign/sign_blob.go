@@ -25,7 +25,9 @@ import (
 	"os"
 	"path/filepath"
 
-	cbundle "github.com/sigstore/cosign/pkg/cosign/bundle"
+	"github.com/sigstore/cosign/internal/pkg/cosign/timestampauthority"
+	"github.com/sigstore/cosign/pkg/cosign/bundle"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/options"
 	"github.com/sigstore/cosign/cmd/cosign/cli/rekor"
@@ -34,7 +36,7 @@ import (
 )
 
 // nolint
-func SignBlobCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.RegistryOptions, payloadPath string, b64 bool, outputSignature string, outputCertificate string) ([]byte, error) {
+func SignBlobCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.RegistryOptions, payloadPath string, b64 bool, outputSignature string, outputCertificate, tsaServerURL string) ([]byte, error) {
 	var payload []byte
 	var err error
 	var rekorBytes []byte
@@ -65,6 +67,21 @@ func SignBlobCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.Re
 
 	signedPayload := cosign.LocalSignedPayload{}
 
+	// TODO: Add suport for TSA only
+	if tsaServerURL != "" {
+		clientTSA, err := tsaclient.GetTimestampClient(tsaServerURL, tsaclient.WithUserAgent("test User-Agent"))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create TSA client: %w", err)
+		}
+		// TODO: @hectorj2f sig should be in encoded in base64
+		entryRespByte, err := timestampauthority.GetTimestampedEntry(sig, clientTSA)
+		if err != nil {
+			return nil, err
+		}
+		// TODO: @hectorj2f Add cert chain
+		signedPayload.Bundle = bundle.EntryToBundle(nil, &bundle.TimestampVerificationData{EntryTimestampAuthority: entryRespByte})
+	}
+
 	if options.EnableExperimental() {
 		rekorBytes, err = sv.Bytes(ctx)
 		if err != nil {
@@ -79,7 +96,7 @@ func SignBlobCmd(ro *options.RootOptions, ko options.KeyOpts, regOpts options.Re
 			return nil, err
 		}
 		fmt.Fprintln(os.Stderr, "tlog entry created with index:", *entry.LogIndex)
-		signedPayload.Bundle = cbundle.EntryToBundle(entry)
+		signedPayload.Bundle = bundle.EntryToBundle(entry, nil)
 	}
 
 	// if bundle is specified, just do that and ignore the rest

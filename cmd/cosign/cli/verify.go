@@ -203,6 +203,8 @@ against the transparency log.`,
 				PredicateType:                o.Predicate.Type,
 				Policies:                     o.Policies,
 				LocalImage:                   o.LocalImage,
+				TSAServerURL:                 o.TSAServerURL,
+				TSACertChainPath:             o.TSACertChainPath,
 			}
 			return v.Exec(cmd.Context(), args)
 		},
@@ -274,7 +276,7 @@ The blob may be specified as a path to a file or - for stdin.`,
 				o.CertVerify.CertEmail, o.CertVerify.CertIdentity, o.CertVerify.CertOidcIssuer, o.CertVerify.CertChain,
 				o.Signature, args[0], o.CertVerify.CertGithubWorkflowTrigger, o.CertVerify.CertGithubWorkflowSha,
 				o.CertVerify.CertGithubWorkflowName, o.CertVerify.CertGithubWorkflowRepository, o.CertVerify.CertGithubWorkflowRef,
-				o.CertVerify.EnforceSCT); err != nil {
+				o.CertVerify.EnforceSCT, o.TSAServerURL, o.TSACertChainPath); err != nil {
 				return fmt.Errorf("verifying blob %s: %w", args, err)
 			}
 			return nil

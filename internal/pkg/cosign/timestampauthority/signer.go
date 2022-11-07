@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tsa
+package timestampauthority
 
 import (
 	"bytes"
@@ -28,7 +28,7 @@ import (
 
 	"github.com/haydentherapper/timestamp"
 	"github.com/sigstore/cosign/internal/pkg/cosign"
-	cbundle "github.com/sigstore/cosign/pkg/cosign/bundle"
+	"github.com/sigstore/cosign/pkg/cosign/bundle"
 	"github.com/sigstore/cosign/pkg/oci"
 	"github.com/sigstore/cosign/pkg/oci/mutate"
 
@@ -37,7 +37,7 @@ import (
 	ts "github.com/sigstore/timestamp-authority/pkg/generated/client/timestamp"
 )
 
-func getTimestampFromTA(tsaBytes, sigBytes []byte, tsaClient *tsaclient.TimestampAuthority) (*cbundle.TSABundle, error) {
+func GetTimestampedEntry(sigBytes []byte, tsaClient *tsaclient.TimestampAuthority) ([]byte, error) {
 	requestBytes, err := createTimestampAuthorityRequest(sigBytes, crypto.SHA256, "")
 	if err != nil {
 		return nil, err
@@ -60,7 +60,8 @@ func getTimestampFromTA(tsaBytes, sigBytes []byte, tsaClient *tsaclient.Timestam
 	}
 
 	fmt.Fprintln(os.Stderr, "Timestamp authority entry created with time:", ts.Time)
-	return cbundle.EntryToTSABundle(respBytes.Bytes(), ts.Time, tsaBytes), nil
+
+	return respBytes.Bytes(), nil
 }
 
 // signerWrapper calls a wrapped, inner signer then uploads either the Cert or Pub(licKey) of the results to Rekor, then adds the resulting `Bundle`
@@ -89,27 +90,32 @@ func (rs *signerWrapper) Sign(ctx context.Context, payload io.Reader) (oci.Signa
 	}
 
 	// Upload the cert or the public key, depending on what we have
+
 	cert, err := sig.Cert()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var tsaBytes []byte
+	var certBytes []byte
 	if cert != nil {
-		tsaBytes, err = cryptoutils.MarshalCertificateToPEM(cert)
+		certBytes, err = cryptoutils.MarshalCertificateToPEM(cert)
 	} else {
-		tsaBytes, err = cryptoutils.MarshalPublicKeyToPEM(pub)
+		certBytes, err = cryptoutils.MarshalPublicKeyToPEM(pub)
 	}
 	if err != nil {
 		return nil, nil, err
 	}
-	// TSA: replaces it Cosign will request a timestamp from the TSA
-	bundle, err := getTimestampFromTA(tsaBytes, sigBytes, rs.tsaClient)
+	// Here we get the response from the timestamped authority server
+	responseBytes, err := GetTimestampedEntry(sigBytes, rs.tsaClient)
 	if err != nil {
 		return nil, nil, err
 	}
+	entry := &bundle.TimestampVerificationData{EntryTimestampAuthority: responseBytes}
 
-	newSig, err := mutate.Signature(sig, mutate.WithTSABundle(bundle))
+	bundle := bundle.EntryToBundle(nil, entry)
+	bundle.CertBytes = certBytes
+
+	newSig, err := mutate.Signature(sig, mutate.WithBundle(bundle))
 	if err != nil {
 		return nil, nil, err
 	}

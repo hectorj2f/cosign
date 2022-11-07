@@ -340,6 +340,15 @@ func TestNewSignatureCertChainAndBundle(t *testing.T) {
 	payload := "this is the other content!"
 	b64sig := "b64 content="
 
+	b := &bundle.Bundle{}
+	b.SignedEntryTimestamp = mustDecode("MEUCIQClUkUqZNf+6dxBc/pxq22JIluTB7Kmip1G0FIF5E0C1wIgLqXm+IM3JYW/P/qjMZSXW+J8bt5EOqNfe3R+0A9ooFE=")
+	b.Payload = bundle.RekorPayload{
+		Body:           "REMOVED",
+		IntegratedTime: 1631646761,
+		LogIndex:       693591,
+		LogID:          "c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d",
+	}
+
 	// This was extracted from gcr.io/distroless/static:nonroot on 2021/09/16
 	var (
 		cert = []byte(`
@@ -375,15 +384,6 @@ Ve/83WrFomwmNf056y1X48F9c4m3a3ozXAIxAKjRay5/aj/jsKKGIkmQatjI8uup
 Hr/+CxFvaJWmpYqNkLDGRU+9orzh5hI2RrcuaQ==
 -----END CERTIFICATE-----
 `)
-		b = &bundle.RekorBundle{
-			SignedEntryTimestamp: mustDecode("MEUCIQClUkUqZNf+6dxBc/pxq22JIluTB7Kmip1G0FIF5E0C1wIgLqXm+IM3JYW/P/qjMZSXW+J8bt5EOqNfe3R+0A9ooFE="),
-			Payload: bundle.RekorPayload{
-				Body:           "REMOVED",
-				IntegratedTime: 1631646761,
-				LogIndex:       693591,
-				LogID:          "c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d",
-			},
-		}
 	)
 
 	l, err := NewSignature([]byte(payload), b64sig,
@@ -435,7 +435,7 @@ Hr/+CxFvaJWmpYqNkLDGRU+9orzh5hI2RrcuaQ==
 			ChainAnnotationKey:       string(chain),
 			// This was extracted from gcr.io/distroless/static:nonroot on 2021/09/16.
 			// The Body has been removed for brevity
-			BundleAnnotationKey: `{"SignedEntryTimestamp":"MEUCIQClUkUqZNf+6dxBc/pxq22JIluTB7Kmip1G0FIF5E0C1wIgLqXm+IM3JYW/P/qjMZSXW+J8bt5EOqNfe3R+0A9ooFE=","Payload":{"body":"REMOVED","integratedTime":1631646761,"logIndex":693591,"logID":"c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"}}`,
+			BundleAnnotationKey: `{"Payload":{"body":"REMOVED","integratedTime":1631646761,"logIndex":693591,"logID":"c0d23d6ad406973f9559f3ba2d1ca01f84147d8ffc5b8445c224f98b9591801d"},"SignedEntryTimestamp":"MEUCIQClUkUqZNf+6dxBc/pxq22JIluTB7Kmip1G0FIF5E0C1wIgLqXm+IM3JYW/P/qjMZSXW+J8bt5EOqNfe3R+0A9ooFE=","EntryTimestampAuthority":null,"CertBytes":null}`,
 		}
 		got, err := l.Annotations()
 		if err != nil {

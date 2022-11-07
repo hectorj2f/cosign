@@ -28,10 +28,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/digitorus/pkcs7"
+	"github.com/digitorus/timestamp"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio/fulcioverifier/ctl"
 	cbundle "github.com/sigstore/cosign/pkg/cosign/bundle"
 	"github.com/sigstore/sigstore/pkg/tuf"
@@ -55,6 +58,7 @@ import (
 	"github.com/sigstore/sigstore/pkg/signature/dsse"
 	"github.com/sigstore/sigstore/pkg/signature/options"
 	sigPayload "github.com/sigstore/sigstore/pkg/signature/payload"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/generated/client"
 )
 
 // Identity specifies an issuer/subject to verify a signature against.
@@ -119,6 +123,11 @@ type CheckOpts struct {
 	// to be met for the signature to ve valid.
 	// Supercedes CertEmail / CertOidcIssuer
 	Identities []Identity
+
+	// TSAClient
+	TSAClient *tsaclient.TimestampAuthority
+
+	TSACertChainPath string
 }
 
 func verifyOCISignature(ctx context.Context, verifier signature.Verifier, sig oci.Signature) error {
@@ -632,7 +641,15 @@ func VerifyImageSignature(ctx context.Context, sig oci.Signature, h v1.Hash, co 
 			return bundleVerified, err
 		}
 	}
+	// TODO: Verify TSA only and return the result with the tsa bundle
+	if co.TSAClient != nil {
+		bundleVerified, err = VerifyTSABundle(ctx, sig, co.TSAClient, co.TSACertChainPath)
+		if err != nil {
+			return false, fmt.Errorf("unable to verify TSA bundle: %w", err)
+		}
 
+		return bundleVerified, nil
+	}
 	bundleVerified, err = VerifyBundle(ctx, sig, co.RekorClient)
 	if err != nil && co.RekorClient == nil {
 		return false, fmt.Errorf("unable to verify bundle: %w", err)
@@ -825,12 +842,20 @@ func verifyImageAttestations(ctx context.Context, atts oci.Signatures, h v1.Hash
 				}
 			}
 
+			if co.TSAClient != nil {
+				bundleVerified, err = VerifyTSABundle(ctx, att, co.TSAClient, co.TSACertChainPath)
+				if err != nil {
+					return fmt.Errorf("unable to verify TSA bundle: %w", err)
+				}
+
+				return nil
+			}
+
 			verified, err := VerifyBundle(ctx, att, co.RekorClient)
 			if err != nil && co.RekorClient == nil {
 				return fmt.Errorf("unable to verify bundle: %w", err)
 			}
 			bundleVerified = bundleVerified || verified
-
 			if !verified && co.RekorClient != nil {
 				if co.SigVerifier != nil {
 					pub, err := co.SigVerifier.PublicKey(co.PKOpts...)
@@ -871,6 +896,90 @@ func CheckExpiry(cert *x509.Certificate, it time.Time) error {
 			ft(cert.NotAfter), ft(it))
 	}
 	return nil
+}
+
+func verifyTSRWithPEM(ts *timestamp.Timestamp, certChainPath string) error {
+	p7Message, err := pkcs7.Parse(ts.RawToken)
+	if err != nil {
+		return fmt.Errorf("Error parsing hashed message: %w", err)
+	}
+
+	pemBytes, err := os.ReadFile(filepath.Clean(certChainPath))
+	if err != nil {
+		return fmt.Errorf("Error reading request from file: %w", err)
+	}
+
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(pemBytes)
+	if !ok {
+		return fmt.Errorf("Error while appending certs from PEM")
+	}
+
+	err = p7Message.VerifyWithChain(certPool)
+	if err != nil {
+		return fmt.Errorf("Error while verifying with chain: %w", err)
+	}
+
+	return nil
+}
+
+func verifyArtifactWithTSR(ts *timestamp.Timestamp, artifactBytes []byte) error {
+	h := ts.HashAlgorithm.New()
+
+	_, err := h.Write(artifactBytes)
+	if err != nil {
+		return fmt.Errorf("failed to create local message hash")
+	}
+	localHashedMessage := h.Sum(nil)
+	if !bytes.Equal(localHashedMessage, ts.HashedMessage) {
+		return fmt.Errorf("hashed messages do not match local hash: %v and time-stamped hashed message: %v", localHashedMessage, ts.HashedMessage)
+	}
+
+	return nil
+}
+
+func VerifyTSABundle(ctx context.Context, sig oci.Signature, tsaClient *tsaclient.TimestampAuthority, tsaCertChainPath string) (bool, error) {
+	bundle, err := sig.Bundle()
+	if err != nil {
+		return false, err
+	} else if bundle == nil {
+		return false, nil
+	}
+
+	b64Sig, err := sig.Base64Signature()
+	if err != nil {
+		return false, fmt.Errorf("reading base64signature: %w", err)
+	}
+
+	sigBytes, err := base64.StdEncoding.DecodeString(b64Sig)
+	if err != nil {
+		return false, fmt.Errorf("reading DecodeString: %w", err)
+	}
+
+	ts, err := timestamp.ParseResponse(bundle.EntryTimestampAuthority)
+	if err != nil {
+		return false, fmt.Errorf("unable to parse the response: %w with bundle %v", err, bundle)
+	}
+
+	err = verifyTSRWithPEM(ts, tsaCertChainPath)
+	if err != nil {
+		return false, fmt.Errorf("unable verifyTSRWithPEM: %w", err)
+	}
+
+	if ts.HashAlgorithm != crypto.SHA256 {
+		return false, fmt.Errorf("unexpected hash algorithm: %v", ts.HashAlgorithm)
+	}
+
+	err = verifyArtifactWithTSR(ts, sigBytes)
+	if err != nil {
+		return false, fmt.Errorf("unable verifyArtifactWithTSR: %w", err)
+	}
+
+	/*if err := compareSigs(bundle.Payload.Body.(string), sig); err != nil {
+		return false, err
+	}*/
+
+	return true, nil
 }
 
 func VerifyBundle(ctx context.Context, sig oci.Signature, rekorClient *client.Rekor) (bool, error) {

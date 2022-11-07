@@ -34,6 +34,7 @@ type SignBlobOptions struct {
 	Registry          RegistryOptions
 	BundlePath        string
 	SkipConfirmation  bool
+	TSAServerURL      string
 }
 
 var _ Interface = (*SignBlobOptions)(nil)
@@ -70,4 +71,7 @@ func (o *SignBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVarP(&o.SkipConfirmation, "yes", "y", false,
 		"skip confirmation prompts for non-destructive operations")
+
+	cmd.Flags().StringVar(&o.TSAServerURL, "tsa-url", "",
+		"url to the Timestamp Authority, default none")
 }

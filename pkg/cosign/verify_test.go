@@ -202,7 +202,7 @@ func signEntry(ctx context.Context, t *testing.T, signer signature.Signer, entry
 	return signature
 }
 
-func CreateTestBundle(ctx context.Context, t *testing.T, rekor signature.Signer, leaf []byte) *bundle.RekorBundle {
+func CreateTestBundle(ctx context.Context, t *testing.T, rekor signature.Signer, leaf []byte) *bundle.Bundle {
 	// generate log ID according to rekor public key
 	pk, _ := rekor.PublicKey(nil)
 	keyID, _ := getLogID(pk)
@@ -214,11 +214,10 @@ func CreateTestBundle(ctx context.Context, t *testing.T, rekor signature.Signer,
 	}
 	// Sign with root.
 	signature := signEntry(ctx, t, rekor, pyld)
-	b := &bundle.RekorBundle{
-		SignedEntryTimestamp: strfmt.Base64(signature),
-		Payload:              pyld,
-	}
-	return b
+	bundle := &bundle.Bundle{}
+	bundle.Payload = pyld
+	bundle.SignedEntryTimestamp = strfmt.Base64(signature)
+	return bundle
 }
 
 func TestVerifyImageSignatureWithNoChain(t *testing.T) {

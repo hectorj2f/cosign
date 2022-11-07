@@ -81,13 +81,15 @@ type VerifyAttestationOptions struct {
 	CheckClaims bool
 	Output      string
 
-	SecurityKey SecurityKeyOptions
-	Rekor       RekorOptions
-	CertVerify  CertVerifyOptions
-	Registry    RegistryOptions
-	Predicate   PredicateRemoteOptions
-	Policies    []string
-	LocalImage  bool
+	SecurityKey      SecurityKeyOptions
+	Rekor            RekorOptions
+	CertVerify       CertVerifyOptions
+	Registry         RegistryOptions
+	Predicate        PredicateRemoteOptions
+	Policies         []string
+	LocalImage       bool
+	TSAServerURL     string
+	TSACertChainPath string
 }
 
 var _ Interface = (*VerifyAttestationOptions)(nil)
@@ -114,6 +116,12 @@ func (o *VerifyAttestationOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().BoolVar(&o.LocalImage, "local-image", false,
 		"whether the specified image is a path to an image saved locally via 'cosign save'")
+
+	cmd.Flags().StringVar(&o.TSAServerURL, "tsa-url", "",
+		"url to the Timestamp Authority, default none")
+
+	cmd.Flags().StringVar(&o.TSACertChainPath, "tsa-cert-chain", "",
+		"path to certificate chain PEM file for the Timestamp Authority")
 }
 
 // VerifyBlobOptions is the top level wrapper for the `verify blob` command.
@@ -122,10 +130,12 @@ type VerifyBlobOptions struct {
 	Signature  string
 	BundlePath string
 
-	SecurityKey SecurityKeyOptions
-	CertVerify  CertVerifyOptions
-	Rekor       RekorOptions
-	Registry    RegistryOptions
+	SecurityKey      SecurityKeyOptions
+	CertVerify       CertVerifyOptions
+	Rekor            RekorOptions
+	Registry         RegistryOptions
+	TSAServerURL     string
+	TSACertChainPath string
 }
 
 var _ Interface = (*VerifyBlobOptions)(nil)
@@ -145,6 +155,12 @@ func (o *VerifyBlobOptions) AddFlags(cmd *cobra.Command) {
 
 	cmd.Flags().StringVar(&o.BundlePath, "bundle", "",
 		"path to bundle FILE")
+
+	cmd.Flags().StringVar(&o.TSAServerURL, "tsa-url", "",
+		"url to the Timestamp Authority, default none")
+
+	cmd.Flags().StringVar(&o.TSACertChainPath, "tsa-cert-chain", "",
+		"path to certificate chain PEM file for the Timestamp Authority")
 }
 
 // VerifyDockerfileOptions is the top level wrapper for the `dockerfile verify` command.

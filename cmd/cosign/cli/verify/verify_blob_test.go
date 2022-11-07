@@ -551,7 +551,7 @@ func TestVerifyBlob(t *testing.T) {
 				co.RekorClient = &mClient
 			}
 
-			var bundle *bundle.RekorBundle
+			var bundle *bundle.Bundle
 			b, err := cosign.FetchLocalSignedPayloadFromPath(tt.bundlePath)
 			if err == nil && b.Bundle != nil {
 				bundle = b.Bundle
@@ -649,16 +649,16 @@ func makeLocalBundle(t *testing.T, rekorSigner signature.ECDSASignerVerifier,
 	b := cosign.LocalSignedPayload{
 		Base64Signature: base64.StdEncoding.EncodeToString(sig),
 		Cert:            string(svBytes),
-		Bundle: &bundle.RekorBundle{
-			Payload: bundle.RekorPayload{
-				Body:           e.Body,
-				IntegratedTime: *e.IntegratedTime,
-				LogIndex:       *e.LogIndex,
-				LogID:          *e.LogID,
-			},
-			SignedEntryTimestamp: e.Verification.SignedEntryTimestamp,
-		},
+		Bundle:          &bundle.Bundle{},
 	}
+
+	b.Bundle.Payload = bundle.RekorPayload{
+		Body:           e.Body,
+		IntegratedTime: *e.IntegratedTime,
+		LogIndex:       *e.LogIndex,
+		LogID:          *e.LogID,
+	}
+	b.Bundle.SignedEntryTimestamp = e.Verification.SignedEntryTimestamp
 
 	// Write bundle to disk
 	jsonBundle, err := json.Marshal(b)
@@ -729,7 +729,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -774,7 +777,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil {
 			t.Fatal("expecting err due to mismatched signatures, got nil")
 		}
@@ -813,7 +819,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil {
 			t.Fatal("expected error due to expired cert, received nil")
 		}
@@ -852,7 +861,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -891,7 +903,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "unable to verify SET") {
 			t.Fatalf("expected error verifying SET, got %v", err)
 		}
@@ -930,7 +945,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "expected identity not found in certificate") {
 			t.Fatalf("expected error with mismatched identity, got %v", err)
 		}
@@ -969,7 +987,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "expected oidc issuer not found in certificate") {
 			t.Fatalf("expected error with mismatched issuer, got %v", err)
 		}
@@ -1009,7 +1030,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err != nil {
 			t.Fatalf("expected success without specifying the intermediates, got %v", err)
 		}
@@ -1048,7 +1072,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err != nil {
 			t.Fatalf("expected success specifying the intermediates, got %v", err)
 		}
@@ -1098,7 +1125,10 @@ func TestVerifyBlobCmdWithBundle(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "verifying certificate from bundle with chain: x509: certificate signed by unknown authority") {
 			t.Fatalf("expected error with mismatched root, got %v", err)
 		}
@@ -1144,7 +1174,10 @@ func TestVerifyBlobCmdInvalidRootCA(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "certificate signed by unknown authority") {
 			t.Fatalf("expected error with invalid root CA, got %v", err)
 		}
@@ -1183,7 +1216,10 @@ func TestVerifyBlobCmdInvalidRootCA(t *testing.T) {
 			// GitHub identity flags start
 			"", "", "", "", "",
 			// GitHub identity flags end
-			false /*enforceSCT*/)
+			false, /*enforceSCT*/
+			"",    /*tsaServerURL*/
+			"",    /*tsaCertChainPath*/
+		)
 		if err == nil || !strings.Contains(err.Error(), "certificate signed by unknown authority") {
 			t.Fatalf("expected error with invalid root CA, got %v", err)
 		}
@@ -1320,15 +1356,15 @@ func createBundle(_ *testing.T, sig []byte, certPem []byte, logID string, integr
 	b := &cosign.LocalSignedPayload{
 		Base64Signature: base64.StdEncoding.EncodeToString(sig),
 		Cert:            string(certPem),
-		Bundle: &bundle.RekorBundle{
-			SignedEntryTimestamp: []byte{},
-			Payload: bundle.RekorPayload{
-				LogID:          logID,
-				IntegratedTime: integratedTime,
-				LogIndex:       1,
-				Body:           rekorEntry,
-			},
-		},
+		Bundle:          &bundle.Bundle{},
+	}
+
+	b.Bundle.SignedEntryTimestamp = []byte{}
+	b.Bundle.Payload = bundle.RekorPayload{
+		LogID:          logID,
+		IntegratedTime: integratedTime,
+		LogIndex:       1,
+		Body:           rekorEntry,
 	}
 
 	return b

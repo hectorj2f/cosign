@@ -57,6 +57,6 @@ type Signature interface {
 	Chain() ([]*x509.Certificate, error)
 
 	// Bundle fetches the optional metadata that records the ephemeral
-	// Fulcio key in the transparency log.
-	Bundle() (*bundle.RekorBundle, error)
+	// Fulcio key in the transparency log, or the recorded entry in the timestamp authority server.
+	Bundle() (*bundle.Bundle, error)
 }

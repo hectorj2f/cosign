@@ -31,6 +31,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/digitorus/timestamp"
 	"github.com/go-openapi/runtime"
 	ssldsse "github.com/secure-systems-lab/go-securesystemslib/dsse"
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
@@ -43,6 +44,7 @@ import (
 	"github.com/sigstore/cosign/pkg/cosign/pkcs11key"
 	sigs "github.com/sigstore/cosign/pkg/signature"
 	"github.com/sigstore/sigstore/pkg/tuf"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 
 	ctypes "github.com/sigstore/cosign/pkg/types"
 	"github.com/sigstore/rekor/pkg/generated/client"
@@ -70,9 +72,9 @@ func VerifyBlobCmd(ctx context.Context, ko options.KeyOpts, certRef, certEmail, 
 	certOidcIssuer, certChain, sigRef, blobRef, certGithubWorkflowTrigger, certGithubWorkflowSha,
 	certGithubWorkflowName,
 	certGithubWorkflowRepository,
-	certGithubWorkflowRef string, enforceSCT bool) error {
+	certGithubWorkflowRef string, enforceSCT bool, tsaServerURL, tsaCertChainPath string) error {
 	var cert *x509.Certificate
-	var bundle *bundle.RekorBundle
+	var bundle *bundle.Bundle
 
 	if !options.OneOf(ko.KeyRef, ko.Sk, certRef) && !options.EnableExperimental() && ko.BundlePath == "" {
 		return &options.PubKeyParseError{}
@@ -98,6 +100,13 @@ func VerifyBlobCmd(ctx context.Context, ko options.KeyOpts, certRef, certEmail, 
 		CertGithubWorkflowRepository: certGithubWorkflowRepository,
 		CertGithubWorkflowRef:        certGithubWorkflowRef,
 		EnforceSCT:                   enforceSCT,
+		TSACertChainPath:             tsaCertChainPath,
+	}
+	if tsaServerURL != "" {
+		co.TSAClient, err = tsaclient.GetTimestampClient(tsaServerURL, tsaclient.WithUserAgent("test User-Agent"))
+		if err != nil {
+			return fmt.Errorf("failed to create TSA client: %w", err)
+		}
 	}
 	if options.EnableExperimental() {
 		if ko.RekorURL != "" {
@@ -217,7 +226,23 @@ func VerifyBlobCmd(ctx context.Context, ko options.KeyOpts, certRef, certEmail, 
 			return fmt.Errorf("loading verifier from bundle: %w", err)
 		}
 		bundle = b.Bundle
-	// No certificate is provided: search by artifact sha in the TLOG.
+	case tsaServerURL != "":
+		bndl, err := cosign.FetchLocalSignedPayloadFromPath(ko.BundlePath)
+		if err != nil {
+			return err
+		}
+		if len(bndl.Bundle.EntryTimestampAuthority) == 0 {
+			return fmt.Errorf("Unable to find timestamp entry in local bundle")
+		}
+		_, err = timestamp.ParseResponse(bndl.Bundle.EntryTimestampAuthority)
+		if err != nil {
+			return fmt.Errorf("unable to parse the response: %w with bundle %v", err, bundle)
+		}
+
+		// TODO: @hectorj2f Add support for blob verification here
+		fmt.Fprintln(os.Stderr, "Verified OK")
+		return nil
+		// No certificate is provided: search by artifact sha in the TLOG.
 	case options.EnableExperimental():
 		uuids, err := cosign.FindTLogEntriesByPayload(ctx, co.RekorClient, blobBytes)
 		if err != nil {
@@ -290,7 +315,7 @@ We recommend requesting the certificate/signature from the original signer of th
 // clean up the args into CheckOpts or use KeyOpts here to resolve different KeyOpts.
 func verifyBlob(ctx context.Context, co *cosign.CheckOpts,
 	blobBytes []byte, sig string, cert *x509.Certificate,
-	bundle *bundle.RekorBundle, e *models.LogEntryAnon) error {
+	bundle *bundle.Bundle, e *models.LogEntryAnon) error {
 	if cert != nil {
 		// This would have already be done in the main entrypoint, but do this for robustness.
 		var err error
@@ -484,7 +509,7 @@ func payloadBytes(blobRef string) ([]byte, error) {
 
 // TODO: RekorClient can be removed when SIGSTORE_TRUST_REKOR_API_PUBLIC_KEY
 // is removed.
-func verifyRekorBundle(ctx context.Context, bundle *bundle.RekorBundle, rekorClient *client.Rekor,
+func verifyRekorBundle(ctx context.Context, bundle *bundle.Bundle, rekorClient *client.Rekor,
 	blobBytes []byte, sig string, pubKeyBytes []byte) (*bundle.RekorPayload, error) {
 	if err := verifyBundleMatchesData(ctx, bundle, blobBytes, pubKeyBytes, []byte(sig)); err != nil {
 		return nil, err
@@ -510,7 +535,7 @@ func verifyRekorBundle(ctx context.Context, bundle *bundle.RekorBundle, rekorCli
 	return &bundle.Payload, nil
 }
 
-func verifyBundleMatchesData(ctx context.Context, bundle *bundle.RekorBundle, blobBytes, certBytes, sigBytes []byte) error {
+func verifyBundleMatchesData(ctx context.Context, bundle *bundle.Bundle, blobBytes, certBytes, sigBytes []byte) error {
 	eimpl, kind, apiVersion, err := unmarshalEntryImpl(bundle.Payload.Body.(string))
 	if err != nil {
 		return err

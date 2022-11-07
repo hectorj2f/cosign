@@ -27,6 +27,7 @@ import (
 	"github.com/sigstore/cosign/pkg/cosign/pkcs11key"
 	"github.com/sigstore/cosign/pkg/cosign/rego"
 	"github.com/sigstore/cosign/pkg/oci"
+	tsaclient "github.com/sigstore/timestamp-authority/pkg/client"
 
 	"github.com/sigstore/cosign/cmd/cosign/cli/fulcio"
 	"github.com/sigstore/cosign/cmd/cosign/cli/options"
@@ -62,6 +63,8 @@ type VerifyAttestationCommand struct {
 	PredicateType                string
 	Policies                     []string
 	LocalImage                   bool
+	TSAServerURL                 string
+	TSACertChainPath             string
 }
 
 // Exec runs the verification command
@@ -89,9 +92,16 @@ func (c *VerifyAttestationCommand) Exec(ctx context.Context, images []string) (e
 		CertGithubWorkflowRepository: c.CertGithubWorkflowRepository,
 		CertGithubWorkflowRef:        c.CertGithubWorkflowRef,
 		EnforceSCT:                   c.EnforceSCT,
+		TSACertChainPath:             c.TSACertChainPath,
 	}
 	if c.CheckClaims {
 		co.ClaimVerifier = cosign.IntotoSubjectClaimVerifier
+	}
+	if c.TSAServerURL != "" {
+		co.TSAClient, err = tsaclient.GetTimestampClient(c.TSAServerURL, tsaclient.WithUserAgent("test User-Agent"))
+		if err != nil {
+			return fmt.Errorf("failed to create TSA client: %w", err)
+		}
 	}
 	if options.EnableExperimental() {
 		if c.RekorURL != "" {

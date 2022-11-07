@@ -40,7 +40,7 @@ import (
 	ifulcio "github.com/sigstore/cosign/internal/pkg/cosign/fulcio"
 	ipayload "github.com/sigstore/cosign/internal/pkg/cosign/payload"
 	irekor "github.com/sigstore/cosign/internal/pkg/cosign/rekor"
-	itsa "github.com/sigstore/cosign/internal/pkg/cosign/tsa"
+	itsa "github.com/sigstore/cosign/internal/pkg/cosign/timestampauthority"
 	"github.com/sigstore/cosign/pkg/cosign"
 	"github.com/sigstore/cosign/pkg/cosign/pivkey"
 	"github.com/sigstore/cosign/pkg/cosign/pkcs11key"
@@ -236,19 +236,14 @@ func signDigest(ctx context.Context, digest name.Digest, payload []byte, ko opti
 		s = ifulcio.NewSigner(s, sv.Cert, sv.Chain)
 	}
 	if tsaURL != "" {
+		// TODO: hectorj2f - fix tsaclient.WithUserAgent("test User-Agent")
 		clientTSA, err := tsaclient.GetTimestampClient(tsaURL, tsaclient.WithUserAgent("test User-Agent"))
 		if err != nil {
 			return fmt.Errorf("failed to create TSA client: %w", err)
 		}
-		/*certChain, err := clientTSA.Timestamp.GetTimestampCertChain(nil)
-		if err != nil || certChain.Error() != "" {
-			return fmt.Errorf("failed to get TSA certificate chain: %w with detailed message: %s", err, certChain.Error())
-		}*/
-		//if certChain.IsSuccess() {
 
 		s = itsa.NewSigner(s, clientTSA)
-	}
-	if ShouldUploadToTlog(ctx, digest, force, noTlogUpload, ko.RekorURL) {
+	} else if ShouldUploadToTlog(ctx, digest, force, noTlogUpload, ko.RekorURL) {
 		rClient, err := rekor.NewClient(ko.RekorURL)
 		if err != nil {
 			return err
