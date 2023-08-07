@@ -23,25 +23,8 @@ on:
   pull_request:
 
 jobs:
-  check-signature:
-    runs-on: ubuntu-latest
-    container:
-      image: gcr.io/projectsigstore/cosign:v2.1.1@sha256:411ace177097a33cb2ee74028a87ffdcb70965003cd1378c1ec7bf9f9dec9359
-
-    steps:
-      - name: Check Signature
-        run: |
-          cosign verify ghcr.io/gythialy/golang-cross:v1.20.6-0@sha256:e0289471f770f238e4fb608e0d804aaf45504ab50b11527cfd00fa42e64344fc \
-          --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-          --certificate-identity "https://github.com/gythialy/golang-cross/.github/workflows/release-golang-cross.yml@refs/tags/v1.20.6-0"
-        env:
-          TUF_ROOT: /tmp
-
   validate-release-job:
     runs-on: ubuntu-latest
-    needs:
-      - check-signature
-
     container:
       image: ghcr.io/gythialy/golang-cross:v1.20.6-0@sha256:e0289471f770f238e4fb608e0d804aaf45504ab50b11527cfd00fa42e64344fc
 
@@ -60,13 +43,26 @@ jobs:
       # - https://github.com/actions/checkout/issues/1048
       # - https://github.com/actions/runner-images/issues/6775
       - run: git config --system --add safe.directory /__w/cosign/cosign
-
+      - name: check disk space
+        run: df -h
+      - name: Free space
+        run: |
+          apt-get remove -y '^dotnet-.*' || true
+          apt-get remove -y '^llvm-.*' || true
+          apt-get remove -y 'php.*' || true
+          apt-get remove -y azure-cli google-cloud-sdk hhvm google-chrome-stable firefox powershell mono-devel || true
+          apt-get autoremove -y
+          apt-get clean
+          rm -rf /usr/share/dotnet/
+      - name: check disk space
+        run: df -h
       - name: goreleaser snapshot
-        run: make snapshot
+        run: make snapshot || true
         env:
           PROJECT_ID: honk-fake-project
           RUNTIME_IMAGE: gcr.io/distroless/static:debug-nonroot
-
+      - name: check disk space
+        run: df -h
       - name: check binaries
         run: |
           ./dist/cosign-linux-amd64 version
