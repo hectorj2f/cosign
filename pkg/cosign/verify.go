@@ -172,7 +172,7 @@ type payloader interface {
 	Payload() ([]byte, error)
 }
 
-func verifyOCIAttestation(ctx context.Context, verifier signature.Verifier, att payloader) error {
+func VerifyOCIAttestation(ctx context.Context, verifier signature.Verifier, att payloader) error {
 	payload, err := att.Payload()
 	if err != nil {
 		return err
@@ -666,7 +666,7 @@ func verifySignatures(ctx context.Context, sigs oci.Signatures, h v1.Hash, co *C
 //     b. If we don't have a Rekor entry retrieved via cert, do an online lookup (assuming
 //     we are in experimental mode).
 //  3. If a certificate is provided, check it's expiration using the transparency log timestamp.
-func verifyInternal(ctx context.Context, sig oci.Signature, h v1.Hash,
+func VerifyInternal(ctx context.Context, sig oci.Signature, h v1.Hash,
 	verifyFn signatureVerificationFn, co *CheckOpts) (
 	bundleVerified bool, err error) {
 	var acceptableRFC3161Time, acceptableRekorBundleTime *time.Time // Timestamps for the signature we accept, or nil if not applicable.
@@ -828,12 +828,12 @@ func keyBytes(sig oci.Signature, co *CheckOpts) ([]byte, error) {
 // VerifyBlobSignature verifies a blob signature.
 func VerifyBlobSignature(ctx context.Context, sig oci.Signature, co *CheckOpts) (bundleVerified bool, err error) {
 	// The hash of the artifact is unused.
-	return verifyInternal(ctx, sig, v1.Hash{}, verifyOCISignature, co)
+	return VerifyInternal(ctx, sig, v1.Hash{}, verifyOCISignature, co)
 }
 
 // VerifyImageSignature verifies a signature
 func VerifyImageSignature(ctx context.Context, sig oci.Signature, h v1.Hash, co *CheckOpts) (bundleVerified bool, err error) {
-	return verifyInternal(ctx, sig, h, verifyOCISignature, co)
+	return VerifyInternal(ctx, sig, h, verifyOCISignature, co)
 }
 
 func loadSignatureFromFile(ctx context.Context, sigRef string, signedImgRef name.Reference, co *CheckOpts) (oci.Signatures, error) {
@@ -959,7 +959,7 @@ func VerifyLocalImageAttestations(ctx context.Context, path string, co *CheckOpt
 
 func VerifyBlobAttestation(ctx context.Context, att oci.Signature, h v1.Hash, co *CheckOpts) (
 	bool, error) {
-	return verifyInternal(ctx, att, h, verifyOCIAttestation, co)
+	return VerifyInternal(ctx, att, h, VerifyOCIAttestation, co)
 }
 
 func VerifyImageAttestation(ctx context.Context, atts oci.Signatures, h v1.Hash, co *CheckOpts) (checkedAttestations []oci.Signature, bundleVerified bool, err error) {
@@ -984,7 +984,7 @@ func VerifyImageAttestation(ctx context.Context, atts oci.Signatures, h v1.Hash,
 				return
 			}
 			if err := func(att oci.Signature) error {
-				verified, err := verifyInternal(ctx, att, h, verifyOCIAttestation, co)
+				verified, err := VerifyInternal(ctx, att, h, VerifyOCIAttestation, co)
 				bundlesVerified[index] = verified
 				return err
 			}(att); err != nil {

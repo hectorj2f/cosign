@@ -115,7 +115,7 @@ func Test_verifyOCIAttestation(t *testing.T) {
 		"signatures":  []dsse.Signature{{Sig: base64.StdEncoding.EncodeToString([]byte("foobar"))}},
 	}
 	// Should Verify
-	if err := verifyOCIAttestation(context.TODO(), &mockVerifier{}, &mockAttestation{payload: valid}); err != nil {
+	if err := VerifyOCIAttestation(context.TODO(), &mockVerifier{}, &mockAttestation{payload: valid}); err != nil {
 		t.Errorf("verifyOCIAttestation() error = %v", err)
 	}
 
